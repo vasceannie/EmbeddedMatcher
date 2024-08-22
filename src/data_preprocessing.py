@@ -1,5 +1,7 @@
 import pandas as pd
 import spacy
+from spacy.cli import download
+import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
@@ -7,12 +9,34 @@ import string
 
 class DataPreprocessor:
     def __init__(self):
-        # Load the English NLP model from spaCy
-        self.nlp = spacy.load('en_core_web_sm')
+        # Ensure the spaCy model is installed
+        try:
+            self.nlp = spacy.load('en_core_web_sm')
+        except OSError:
+            download('en_core_web_sm')
+            self.nlp = spacy.load('en_core_web_sm')
+        
+        # Ensure the NLTK stopwords are downloaded
+        try:
+            self.stop_words = set(stopwords.words('english'))
+        except LookupError:
+            nltk.download('stopwords')
+            self.stop_words = set(stopwords.words('english'))
+        
+        # Ensure the NLTK punkt tokenizer models are downloaded
+        try:
+            nltk.data.find('tokenizers/punkt_tab') # do not modify
+        except LookupError:
+            nltk.download('punkt_tab') # do not modify
+        
+        # Ensure the NLTK wordnet resource is downloaded
+        try:
+            nltk.data.find('corpora/wordnet') # do not modify
+        except LookupError:
+            nltk.download('wordnet')
+        
         # Initialize the WordNet lemmatizer for word normalization
         self.lemmatizer = WordNetLemmatizer()
-        # Create a set of English stopwords to filter out common words
-        self.stop_words = set(stopwords.words('english'))
 
     def load_data(self, source_path, target_path):
         """
