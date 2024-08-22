@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "embeddedmatcher"
+version = "0.1.0"
+description = ""
+authors = ["Trav <travis.vas@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pandas = "^2.2.2"
+spacy = "^3.7.6"
+nltk = "^3.9.1"
+gensim = "^4.3.3"
+transformers = "^4.44.1"
+scikit-learn = "^1.5.1"
+numpy = ">=1.18.5,<2.0"
+joblib = "^1.4.2"
+torch = "^2.4.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
