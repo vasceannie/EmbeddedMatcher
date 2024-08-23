@@ -16,6 +16,10 @@ scikit-learn = "^1.5.1"
 numpy = ">=1.18.5,<2.0"
 joblib = "^1.4.2"
 torch = "^2.4.0"
+sqlalchemy = "^2.0.32"
+pymongo = "^4.8.0"
+python-dotenv = "^1.0.1"
+psycopg2-binary = "^2.9.9"
 
 
 [build-system]

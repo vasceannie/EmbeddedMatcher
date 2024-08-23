@@ -1,37 +1,99 @@
-import joblib
 import pandas as pd
+import sqlalchemy
+from pymongo import MongoClient
+import numpy as np
+import json
+import os
+from dotenv import load_dotenv
 
-def save_embeddings(df, filename):
+# Load environment variables from .env file
+load_dotenv()
+
+class EmbeddingManager:
     """
-    Save the BERT embeddings and their associated categories to a CSV file.
+    A class to manage the saving and loading of BERT embeddings.
 
-    This function takes a DataFrame containing categories and their corresponding BERT embeddings,
-    and saves the relevant data to a specified CSV file. The resulting CSV will have two columns:
-    'category' and 'bert_embedding'.
-
-    Args:
-        df (pandas.DataFrame): The DataFrame containing 'category' and 'bert_embedding' columns.
-        filename (str): The name of the file where the DataFrame will be saved.
+    This class provides methods to save BERT embeddings and their associated categories to various storage options,
+    including CSV files, PostgreSQL, MongoDB, and universal database types.
     """
-    # Select the relevant columns and save the DataFrame to a CSV file
-    df[['category', 'bert_embedding']].to_csv(filename, index=False)
 
-def load_embeddings(filename):
-    """
-    Load BERT embeddings from a CSV file into a DataFrame.
+    @staticmethod
+    def get_postgres_connection_string():
+        """
+        Construct the PostgreSQL connection string from environment variables.
+        """
+        host = os.getenv('POSTGRES_HOST', 'localhost')
+        port = os.getenv('POSTGRES_PORT', '5432')
+        db = os.getenv('POSTGRES_DB', 'your_database_name')
+        user = os.getenv('POSTGRES_USER', 'your_username')
+        password = os.getenv('POSTGRES_PASSWORD', 'your_password')
+        return f"postgresql://{user}:{password}@{host}:{port}/{db}"
 
-    This function reads a CSV file containing categories and their corresponding BERT embeddings,
-    and loads the data into a DataFrame. The 'bert_embedding' column is processed to convert
-    the string representations of embeddings back into their original format using joblib.
+    @staticmethod
+    def save_embeddings(df, destination, db_type='csv'):
+        """
+        Save the BERT embeddings and their associated categories to the specified destination.
 
-    Args:
-        filename (str): The name of the file from which to load the embeddings.
+        Args:
+            df (pandas.DataFrame): The DataFrame containing 'category' and 'bert_embedding' columns.
+            destination (str): The destination where the DataFrame will be saved (filename for CSV, connection string for databases).
+            db_type (str): The type of database ('csv', 'postgres', 'mongo', or 'universal'). Default is 'csv'.
+        """
+        df = df.copy()
+        df['bert_embedding'] = df['bert_embedding'].apply(lambda x: x.tolist())
 
-    Returns:
-        pandas.DataFrame: A DataFrame containing the loaded categories and their BERT embeddings.
-    """
-    # Read the CSV file into a DataFrame
-    df = pd.read_csv(filename)
-    # Convert the string representations of embeddings back into numpy arrays
-    df['bert_embedding'] = df['bert_embedding'].apply(lambda x: joblib.loads(x))
-    return df
+        load_dotenv()  # Load environment variables from .env file
+        if db_type == 'csv':
+            df['bert_embedding'] = df['bert_embedding'].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
+            df.to_csv(destination, index=False)
+        elif db_type == 'postgres':
+            connection_string = EmbeddingManager.get_postgres_connection_string()
+            engine = sqlalchemy.create_engine(connection_string)
+            df['bert_embedding'] = df['bert_embedding'].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
+            df.to_sql('embeddings', engine, if_exists='replace', index=False)
+        elif db_type == 'mongo':
+            client = MongoClient(destination)
+            db = client['embeddings_db']
+            collection = db['embeddings']
+            records = df.to_dict(orient='records')
+            collection.insert_many(records)
+        elif db_type == 'universal':
+            # Implement universal database saving logic here
+            pass
+        else:
+            raise ValueError("Unsupported database type. Use 'csv', 'postgres', 'mongo', or 'universal'.")
+
+    @staticmethod
+    def load_embeddings(destination, db_type='csv'):
+        """
+        Load BERT embeddings from the specified source into a DataFrame.
+
+        Args:
+            destination (str): The source from which to load the embeddings (filename for CSV, connection string for databases).
+            db_type (str): The type of database ('csv', 'postgres', 'mongo', or 'universal'). Default is 'csv'.
+
+        Returns:
+            pandas.DataFrame: A DataFrame containing the loaded categories and their BERT embeddings.
+        """
+        load_dotenv()  # Load environment variables from .env file
+        if db_type == 'csv':
+            df = pd.read_csv(destination)
+            df['bert_embedding'] = df['bert_embedding'].apply(lambda x: np.array(json.loads(x)) if isinstance(x, str) else x)
+        elif db_type == 'postgres':
+            connection_string = EmbeddingManager.get_postgres_connection_string()
+            engine = sqlalchemy.create_engine(connection_string)
+            df = pd.read_sql('embeddings', engine)
+            df['bert_embedding'] = df['bert_embedding'].apply(lambda x: np.array(json.loads(x)))
+        elif db_type == 'mongo':
+            client = MongoClient(destination)
+            db = client['embeddings_db']
+            collection = db['embeddings']
+            records = collection.find()
+            df = pd.DataFrame(list(records))
+        elif db_type == 'universal':
+            # Implement universal database loading logic here
+            pass
+        else:
+            raise ValueError("Unsupported database type. Use 'csv', 'postgres', 'mongo', or 'universal'.")
+
+        return df
