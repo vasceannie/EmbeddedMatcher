@@ -6,7 +6,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 import string
-
+import re
 class DataPreprocessor:
     def __init__(self):
         # Ensure the spaCy model is installed
@@ -73,34 +73,23 @@ class DataPreprocessor:
         return source_df, target_df
 
     def preprocess(self, text):
-        """
-        Preprocess the input text by normalizing it.
-
-        This function converts the text to lowercase, removes punctuation,
-        tokenizes the text, and removes stopwords. It also lemmatizes the
-        remaining words to their base forms.
-
-        Args:
-            text (str): The input text to preprocess.
-
-        Returns:
-            str: The preprocessed text as a single string.
-        """
-        # Convert text to lowercase and remove punctuation
-        text = text.lower().translate(str.maketrans('', '', string.punctuation))
-        # Tokenize the text and remove stopwords
-        tokens = word_tokenize(text)
-        tokens = [self.lemmatizer.lemmatize(word) for word in tokens if word not in self.stop_words]
-        # Join the tokens back into a single string
-        return ' '.join(tokens)
+        if pd.isna(text):
+            return ''
+        text = str(text).lower()
+        # Remove punctuation and extra whitespace
+        text = re.sub(r'[^\w\s]', '', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
 
     def preprocess_dataframes(self, source_df, target_df):
         """
-        Preprocess the 'category' column in both source and target DataFrames.
+        Preprocess the 'classification_name' column in the source DataFrame and
+        category columns in the target DataFrame.
 
         This function applies the preprocessing steps defined in the
-        preprocess function to the 'category' column of both DataFrames,
-        creating a new column 'processed_category' in each.
+        preprocess function to the 'classification_name' column of the source DataFrame
+        and all category level columns of the target DataFrame,
+        creating new processed columns in each.
 
         Args:
             source_df (pandas.DataFrame): The DataFrame containing source categories.
@@ -109,10 +98,14 @@ class DataPreprocessor:
         Returns:
             tuple: A tuple containing the updated source and target DataFrames.
         """
-        # Apply the preprocess function to the 'category' column of the source DataFrame
-        source_df['processed_category'] = source_df['category'].apply(self.preprocess)
-        
-        # Apply the preprocess function to the 'category' column of the target DataFrame
-        target_df['processed_category'] = target_df['category'].apply(self.preprocess)
-        
+        # Preprocess source dataframe
+        source_df['processed_category'] = source_df['classification_name'].apply(self.preprocess)
+
+        # Preprocess target dataframe
+        for col in ['Lv1_category_name', 'Lv2_category_name', 'Lv3_category_name', 'Lv4_category_name']:
+            target_df[f'processed_{col}'] = target_df[col].apply(self.preprocess)
+
+        # Combine all processed levels into a single 'processed_category' column for target_df
+        target_df['processed_category'] = target_df[[f'processed_{col}' for col in ['Lv1_category_name', 'Lv2_category_name', 'Lv3_category_name', 'Lv4_category_name']]].agg(' '.join, axis=1)
+
         return source_df, target_df

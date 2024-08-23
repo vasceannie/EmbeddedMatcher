@@ -47,14 +47,14 @@ class SynonymMatcher:
                     synonyms.add(lemma.name())
         return synonyms  # Return the set of synonyms
 
-    def synonym_match(self, source_category, target_categories):
+    def synonym_match(self, source_category, target_df):
         """
         Match the source category against target categories based on synonyms.
 
         Args:
             source_category (str): The source category to match.
-            target_categories (pandas.DataFrame): A DataFrame containing target
-                                                   categories with a 'processed_category' column.
+            target_df (pandas.DataFrame): A DataFrame containing target
+                                           categories with a 'processed_category' column.
 
         Returns:
             list: A list of tuples containing matching target categories and their
@@ -70,7 +70,7 @@ class SynonymMatcher:
         matches = []  # Initialize a list to hold matches
         
         # Iterate through target categories to find matches
-        for index, row in target_categories.iterrows():
+        for index, row in target_df.iterrows():
             target_words = row['processed_category'].split()  # Split the target category into words
             target_synonyms = set()  # Initialize a set to hold synonyms for the target category
             
@@ -83,10 +83,10 @@ class SynonymMatcher:
             if common_synonyms:  # If there are common synonyms
                 match_score = len(common_synonyms) / len(source_synonyms)  # Calculate match score
                 if match_score >= self.threshold:  # Check if the score meets the threshold
-                    matches.append((row['category'], match_score))  # Append the match and score to the list
+                    matches.append((row['Lv4_category_name'], match_score))  # Append the match and score to the list
         
         print(f"Matches for {source_category}: {matches}")  # Debug print to show matches found
-        return matches  # Return the list of matches
+        return sorted(matches, key=lambda x: x[1], reverse=True)[:5]  # Return top 5 matches
 
     def apply_synonym_matching(self, source_df, target_df):
         """
