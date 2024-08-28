@@ -49,12 +49,16 @@ class EmbeddingManager:
         Returns:
             None
         """
+        if isinstance(path_or_connection_string, str):
+            engine = create_engine(path_or_connection_string)
+        else:
+            engine = path_or_connection_string  # Assume it's already an engine object
+        
         if db_type == 'csv':
             # Save the DataFrame to a CSV file
             df.to_csv(path_or_connection_string, index=False)
         elif db_type == 'postgres':
             # Save the DataFrame to a PostgreSQL database
-            engine = create_engine(path_or_connection_string)
             df.to_sql('embeddings', engine, if_exists='replace', index=False)
         elif db_type == 'mongo':
             # Save the DataFrame to a MongoDB database

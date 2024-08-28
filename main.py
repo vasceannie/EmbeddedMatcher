@@ -56,14 +56,13 @@ def save_checkpoint(df, table_name, engine):
     df_copy = df.copy()
     
     for col in df_copy.columns:
-        if df_copy[col].dtype == 'object':
-            df_copy[col] = df_copy[col].apply(lambda x: json.dumps(serialize(x)) if x is not None else None)  # Handle None values
+        if df_copy[col].dtype == 'object' or df_copy[col].dtypes.name == 'object':
+            df_copy[col] = df_copy[col].apply(lambda x: str(x) if x is not None else None)
     
     try:
         df_copy.to_sql(table_name, engine, if_exists='replace', index=False)
     except Exception as e:
         logger.error(f"Error saving checkpoint: {e}")
-        # Fallback: save to CSV
         csv_filename = f"{table_name}_checkpoint.csv"
         df_copy.to_csv(csv_filename, index=False)
         logger.info(f"Checkpoint saved to CSV: {csv_filename}")
@@ -151,7 +150,7 @@ def main():
     target_df = cosine_matcher.generate_embeddings(target_df)
 
     # Determine the number of processes to use (leave one core free for system tasks)
-    num_processes = mp.cpu_count() - 1
+    num_processes = mp.cpu_count() - 6
 
     # Split the source DataFrame into chunks
     chunks = np.array_split(source_df, num_processes)
@@ -194,7 +193,12 @@ def main():
         embedding_manager = EmbeddingManager()
         source_id_col = 'classification_name' if 'classification_name' in final_df.columns else final_df.columns[0]
         target_id_col = 'category' if 'category' in target_df.columns else target_df.columns[0]
-        embedding_manager.save_embeddings(final_df[[source_id_col, 'bert_embedding']], engine, db_type='postgres')
+        connection_string = str(engine.url)
+        embedding_manager.save_embeddings(
+            final_df[[source_id_col, 'bert_embedding']], 
+            connection_string,  # Use the connection string instead of the engine
+            db_type='postgres'
+        )
         embedding_manager.save_embeddings(target_df[[target_id_col, 'bert_embedding']], engine, db_type='postgres')
     else:
         print("BERT embeddings not available. Skipping embedding save step.")
