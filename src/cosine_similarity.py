@@ -55,13 +55,14 @@ class CosineSimilarityMatcher:
             pandas.DataFrame: The DataFrame with an additional 'bert_embedding' column
                               containing the generated embeddings.
         """
-        # Log the state of the DataFrame
+        # Log the state of the DataFrame before generating embeddings
         logging.info(f"DataFrame before generating embeddings: {df.head()}")
         
-        # Ensure 'processed_category' column exists
+        # Ensure 'processed_category' column exists in the DataFrame
         if 'processed_category' not in df.columns:
             raise KeyError("The column 'processed_category' does not exist in the DataFrame.")
         
+        # Apply the get_bert_embedding method to each entry in the 'processed_category' column
         df['bert_embedding'] = df['processed_category'].apply(self.get_bert_embedding)
         return df
 
@@ -76,14 +77,15 @@ class CosineSimilarityMatcher:
         Returns:
             tuple: A tuple containing the best matching target embedding and its similarity score.
         """
-        # Ensure source_embedding is 2D
+        # Ensure source_embedding is 2D by reshaping it
         source_embedding = source_embedding.reshape(1, -1)
+        
         # Convert target_embeddings to a 2D numpy array
         target_embeddings = np.array(target_embeddings)
         if target_embeddings.ndim == 1:
             target_embeddings = target_embeddings.reshape(1, -1)
         
-        # Compute cosine similarities
+        # Compute cosine similarities between the source embedding and target embeddings
         similarities = cosine_similarity(source_embedding, target_embeddings)
         
         # Find the index of the best matching target embedding
@@ -104,7 +106,7 @@ class CosineSimilarityMatcher:
             pandas.DataFrame: The source DataFrame with an additional 'cosine_matches' column
                               containing the best matches and their similarity scores.
         """
-        # Apply cosine_match to each source embedding and store the results in a new column
+        # Apply the cosine_match method to each source embedding and store the results in a new column
         source_df['cosine_matches'] = source_df['bert_embedding'].apply(
             lambda x: self.cosine_match(x, target_df['bert_embedding'].tolist())
         )

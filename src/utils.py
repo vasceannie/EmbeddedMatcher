@@ -22,12 +22,18 @@ class EmbeddingManager:
     def get_postgres_connection_string():
         """
         Construct the PostgreSQL connection string from environment variables.
+
+        Returns:
+            str: The constructed PostgreSQL connection string.
         """
+        # Retrieve PostgreSQL connection details from environment variables
         host = os.getenv('POSTGRES_HOST', 'localhost')
         port = os.getenv('POSTGRES_PORT', '5432')
         db = os.getenv('POSTGRES_DB', 'your_database_name')
         user = os.getenv('POSTGRES_USER', 'your_username')
         password = os.getenv('POSTGRES_PASSWORD', 'your_password')
+        
+        # Construct and return the PostgreSQL connection string
         return f"postgresql://{user}:{password}@{host}:{port}/{db}?connect_timeout=60"
 
     @staticmethod
@@ -44,16 +50,20 @@ class EmbeddingManager:
             None
         """
         if db_type == 'csv':
+            # Save the DataFrame to a CSV file
             df.to_csv(path_or_connection_string, index=False)
         elif db_type == 'postgres':
+            # Save the DataFrame to a PostgreSQL database
             engine = create_engine(path_or_connection_string)
             df.to_sql('embeddings', engine, if_exists='replace', index=False)
         elif db_type == 'mongo':
+            # Save the DataFrame to a MongoDB database
             client = MongoClient(path_or_connection_string)
             db = client['embedding_db']
-            collection = db['embeddings']  # {{ edit_1 }} Define the collection
+            collection = db['embeddings']  # Define the collection
             collection.insert_many(df.to_dict('records'))
         else:
+            # Raise an error if the db_type is unsupported
             raise ValueError(f"Unsupported db_type: {db_type}")
 
     @staticmethod
@@ -69,6 +79,7 @@ class EmbeddingManager:
             pandas.DataFrame: A DataFrame containing the loaded categories and their BERT embeddings.
         """
         if db_type == 'csv':
+            # Load the DataFrame from a CSV file
             df = pd.read_csv(path_or_connection_string)
             # Convert the 'bert_embedding' column back to numpy arrays
             df['bert_embedding'] = df['bert_embedding'].apply(
@@ -76,6 +87,7 @@ class EmbeddingManager:
             )
             return df
         elif db_type == 'postgres':
+            # Load the DataFrame from a PostgreSQL database
             engine = create_engine(path_or_connection_string)
             df = pd.read_sql_table('embeddings', engine)
             # Convert the 'bert_embedding' column back to numpy arrays
@@ -86,10 +98,11 @@ class EmbeddingManager:
             )
             return df
         elif db_type == 'mongo':
+            # Load the DataFrame from a MongoDB database
             client = MongoClient(path_or_connection_string)
             db = client['embedding_db']
-            collection = db['embeddings']  # {{ edit_1 }} Define the collection
-            # Load BERT embeddings from the specified database into a DataFrame.
+            collection = db['embeddings']  # Define the collection
+            # Load BERT embeddings from the specified database into a DataFrame
             df = pd.DataFrame(list(collection.find()))
             # Sanitize the 'bert_embedding' column to remove any entries with null bytes
             df = df[df['bert_embedding'].apply(lambda x: isinstance(x, str) and '\x00' not in x)]
@@ -101,4 +114,5 @@ class EmbeddingManager:
             )
             return df
         else:
+            # Raise an error if the db_type is unsupported
             raise ValueError(f"Unsupported db_type: {db_type}")
