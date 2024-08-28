@@ -23,13 +23,9 @@ class CombinedMatcher:
         self.synonym_weight = synonym_weight
         self.cosine_weight = cosine_weight
 
-    @staticmethod
-    def combined_match(synonym_matches, cosine_matches):
+    def combined_match(self, synonym_matches, cosine_matches):
         """
-        Combine the results of synonym matching and cosine similarity to determine the best match.
-
-        This method compares the highest scores from both synonym and cosine matches and returns the match
-        with the highest individual score.
+        Combine the results of synonym matching and cosine similarity using weights.
 
         Args:
             synonym_matches (list): A list of tuples where each tuple contains a synonym match and its associated score.
@@ -42,26 +38,32 @@ class CombinedMatcher:
         print(f"Debug - synonym_matches: {synonym_matches}")
         print(f"Debug - cosine_matches: {cosine_matches}")
 
+        # Filter out non-tuple elements from synonym_matches
+        synonym_matches = [match for match in synonym_matches if isinstance(match, tuple)]
+        # Filter out non-tuple elements from cosine_matches
+        cosine_matches = [match for match in cosine_matches if isinstance(match, tuple)]
+
         # If both lists are empty, return (None, 0)
         if not synonym_matches and not cosine_matches:
             return (None, 0)
 
-        # If only synonym matches are available, return the best synonym match
-        if not synonym_matches:
-            return max(cosine_matches, key=lambda x: x[1])
+        # Calculate weighted scores for each synonym match
+        weighted_matches = []
+        for match, score in synonym_matches:
+            weighted_score = score * self.synonym_weight
+            weighted_matches.append((match, weighted_score, 'synonym'))
+        
+        # Calculate weighted scores for each cosine match
+        for match, score in cosine_matches:
+            weighted_score = score * self.cosine_weight
+            weighted_matches.append((match, weighted_score, 'cosine'))
 
-        # If only cosine matches are available, return the best cosine match
-        if not cosine_matches:
-            return max(synonym_matches, key=lambda x: x[1])
-
-        # Find the best match from both synonym and cosine matches
-        best_synonym_match = max(synonym_matches, key=lambda x: x[1])
-        best_cosine_match = max(cosine_matches, key=lambda x: x[1])
-
-        # Return the match with the highest individual score
-        result = best_synonym_match if best_synonym_match[1] >= best_cosine_match[1] else best_cosine_match
-        print(f"Debug - combined_match result: {result}")
-        return result
+        # Find the match with the highest weighted score
+        if weighted_matches:
+            best_match = max(weighted_matches, key=lambda x: x[1])
+            return (best_match[0], best_match[1])
+        else:
+            return (None, 0)
 
     @staticmethod
     def apply_combined_scoring(df):
@@ -114,6 +116,19 @@ class CombinedMatcher:
         Returns:
             pandas.DataFrame: The DataFrame with an additional 'final_match' column containing the best matches
                               and their combined scores.
+        """
+    def apply_combined_scoring(self, df):
+        """
+        Apply combined scoring to the DataFrame.
+
+        This method applies the combined_match function to each row of the DataFrame,
+        combining synonym matches and cosine similarity matches.
+
+        Args:
+            df (pandas.DataFrame): The input DataFrame containing synonym and cosine matches.
+
+        Returns:
+            pandas.DataFrame: The input DataFrame with additional columns for the best match and its score.
         """
         def combined_match_wrapper(row):
             """

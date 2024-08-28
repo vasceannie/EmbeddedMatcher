@@ -20,9 +20,11 @@ class SynonymMatcher:
                                a match. Default is 0.1.
         """
         self.threshold = threshold
+        # Download necessary NLTK resources quietly
         nltk.download('punkt', quiet=True)
         nltk.download('stopwords', quiet=True)
         nltk.download('wordnet', quiet=True)
+        # Set of stopwords to filter out common words
         self.stop_words = set(stopwords.words('english'))
 
     def tokenize(self, text):
@@ -35,9 +37,9 @@ class SynonymMatcher:
         Returns:
             list: A list of tokens after processing the input text.
         """
-        # Convert to lowercase and tokenize
+        # Convert text to lowercase and tokenize it
         tokens = word_tokenize(text.lower())
-        # Remove punctuation and stopwords
+        # Remove punctuation and stopwords from the tokens
         tokens = [token for token in tokens if token not in string.punctuation and token not in self.stop_words]
         return tokens
 
@@ -51,7 +53,8 @@ class SynonymMatcher:
         Returns:
             set: A set of synonyms for the input word.
         """
-        synonyms = set([word])  # Include the original word
+        # Initialize a set with the original word included
+        synonyms = set([word])
         # Iterate through the synsets of the given word
         for syn in wn.synsets(word):
             # Add all lemma names from the synset to the synonyms set
@@ -88,12 +91,12 @@ class SynonymMatcher:
             for token in target_tokens:
                 target_synonyms.update(self.get_synonyms(token))
             
-            # Calculate Jaccard similarity
+            # Calculate Jaccard similarity between source and target synonyms
             intersection = len(source_synonyms.intersection(target_synonyms))
             union = len(source_synonyms.union(target_synonyms))
             match_score = intersection / union if union > 0 else 0
             
-            # Append matches with their scores
+            # Append matches with their scores to the matches list
             matches.append((target_category, match_score))
         
         # Sort matches by score in descending order
@@ -113,7 +116,8 @@ class SynonymMatcher:
             pandas.DataFrame: The updated source DataFrame with a new column
                               containing the matches and their similarity scores.
         """
-        result_df = source_df.copy()  # Create a copy of the source DataFrame to avoid modifying the original
+        # Create a copy of the source DataFrame to avoid modifying the original
+        result_df = source_df.copy()
         
         # Ensure 'processed_category' exists in result_df
         if 'processed_category' not in result_df.columns:
@@ -123,5 +127,6 @@ class SynonymMatcher:
         result_df['synonym_matches'] = result_df['processed_category'].apply(
             lambda x: self.synonym_match(x, target_df)  # Use a lambda function to apply synonym matching
         )
-        print(f"Applied synonym matching: {result_df}")  # Debug print to show the result DataFrame
+        # Debug print to show the result DataFrame after applying synonym matching
+        print(f"Applied synonym matching: {result_df}")
         return result_df  # Return the DataFrame with matches
