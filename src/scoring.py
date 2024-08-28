@@ -1,4 +1,5 @@
 import logging
+import pandas as pd
 
 class CombinedMatcher:
     """
@@ -24,8 +25,11 @@ class CombinedMatcher:
             tuple: A tuple containing the best match (str) and its combined score (float). 
                    If no matches are found, returns (None, 0).
         """
+        print(f"Debug - synonym_matches: {synonym_matches}")
+        print(f"Debug - cosine_matches: {cosine_matches}")
+
         if not synonym_matches and not cosine_matches:
-            return None, 0
+            return (None, 0)
 
         if not synonym_matches:
             return max(cosine_matches, key=lambda x: x[1])
@@ -37,7 +41,9 @@ class CombinedMatcher:
         best_synonym_match = max(synonym_matches, key=lambda x: x[1])
         best_cosine_match = max(cosine_matches, key=lambda x: x[1])
 
-        return best_synonym_match if best_synonym_match[1] >= best_cosine_match[1] else best_cosine_match
+        result = best_synonym_match if best_synonym_match[1] >= best_cosine_match[1] else best_cosine_match
+        print(f"Debug - combined_match result: {result}")
+        return result
 
     @staticmethod
     def apply_combined_scoring(df):
@@ -59,8 +65,32 @@ class CombinedMatcher:
         return df
 
     def apply_combined_scoring(self, df):
-        df['final_match'] = df.apply(lambda row: self.combined_match(
-            row.get('synonym_matches', []),
-            row.get('cosine_matches', [])
-        ), axis=1)
+        def combined_match_wrapper(row):
+            result = self.combined_match(
+                row.get('synonym_matches', []),
+                row.get('cosine_matches', [])
+            )
+            print(f"Debug - combined_match result: {result}")
+            print(f"Debug - result type: {type(result)}")
+            
+            if isinstance(result, pd.DataFrame):
+                print(f"Debug - DataFrame columns: {result.columns}")
+                print(f"Debug - DataFrame shape: {result.shape}")
+                # If it's a DataFrame, take the first row as a tuple
+                return tuple(result.iloc[0])
+            elif isinstance(result, tuple):
+                return result
+            else:
+                print(f"Debug - Unexpected result type: {type(result)}")
+                return (None, 0)  # Default value if result is unexpected
+
+        # Apply the function row by row and collect the results
+        results = []
+        for _, row in df.iterrows():
+            result = combined_match_wrapper(row)
+            results.append(result)
+            print(f"Debug - Appended result: {result}")
+
+        # Assign the results to the 'final_match' column
+        df['final_match'] = results
         return df
