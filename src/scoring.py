@@ -34,7 +34,6 @@ class CombinedMatcher:
         Args:
             synonym_matches (list): A list of tuples where each tuple contains a synonym match and its associated score.
             cosine_matches (list): A list of tuples where each tuple contains a cosine match and its associated score.
-
         Returns:
             tuple: A tuple containing the best match (str) and its combined score (float). 
                    If no matches are found, returns (None, 0).
@@ -42,17 +41,21 @@ class CombinedMatcher:
         print(f"Debug - synonym_matches: {synonym_matches}")
         print(f"Debug - cosine_matches: {cosine_matches}")
 
+        # Filter out non-tuple elements
+        synonym_matches = [match for match in synonym_matches if isinstance(match, tuple)]
+        cosine_matches = [match for match in cosine_matches if isinstance(match, tuple)]
+
         # If both lists are empty, return (None, 0)
         if not synonym_matches and not cosine_matches:
             return (None, 0)
 
         # If only synonym matches are available, return the best synonym match
-        if not synonym_matches:
-            return max(cosine_matches, key=lambda x: x[1])
-
-        # If only cosine matches are available, return the best cosine match
         if not cosine_matches:
             return max(synonym_matches, key=lambda x: x[1])
+
+        # If only cosine matches are available, return the best cosine match
+        if not synonym_matches:
+            return max(cosine_matches, key=lambda x: x[1])
 
         # Find the best match from both synonym and cosine matches
         best_synonym_match = max(synonym_matches, key=lambda x: x[1])
