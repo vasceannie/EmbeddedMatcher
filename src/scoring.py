@@ -30,6 +30,7 @@ class CombinedMatcher:
         Args:
             synonym_matches (list): A list of tuples where each tuple contains a synonym match and its associated score.
             cosine_matches (list): A list of tuples where each tuple contains a cosine match and its associated score.
+
         Returns:
             tuple: A tuple containing the best match (str) and its combined score (float). 
                    If no matches are found, returns (None, 0).
@@ -37,20 +38,22 @@ class CombinedMatcher:
         print(f"Debug - synonym_matches: {synonym_matches}")
         print(f"Debug - cosine_matches: {cosine_matches}")
 
-        # Filter out non-tuple elements
+        # Filter out non-tuple elements from synonym_matches
         synonym_matches = [match for match in synonym_matches if isinstance(match, tuple)]
+        # Filter out non-tuple elements from cosine_matches
         cosine_matches = [match for match in cosine_matches if isinstance(match, tuple)]
 
         # If both lists are empty, return (None, 0)
         if not synonym_matches and not cosine_matches:
             return (None, 0)
 
-        # Calculate weighted scores for each match
+        # Calculate weighted scores for each synonym match
         weighted_matches = []
         for match, score in synonym_matches:
             weighted_score = score * self.synonym_weight
             weighted_matches.append((match, weighted_score, 'synonym'))
         
+        # Calculate weighted scores for each cosine match
         for match, score in cosine_matches:
             weighted_score = score * self.cosine_weight
             weighted_matches.append((match, weighted_score, 'cosine'))

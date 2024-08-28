@@ -13,61 +13,119 @@ from src.validation_metrics import ValidationMetrics
 import json
 import multiprocessing as mp
 
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def get_postgres_engine():
+    """
+    Create and return a SQLAlchemy engine for PostgreSQL connection.
+
+    This function retrieves the PostgreSQL connection string using the EmbeddingManager class
+    and creates a SQLAlchemy engine with a connection timeout of 10 seconds.
+
+    Returns:
+        sqlalchemy.engine.Engine: The SQLAlchemy engine for PostgreSQL connection.
+    """
     connection_string = EmbeddingManager.get_postgres_connection_string()
     return create_engine(connection_string, connect_args={"connect_timeout": 10})
 
 def serialize(obj):
+    """
+    Serialize various data types to JSON-compatible formats.
+
+    This function handles the serialization of numpy arrays, pandas DataFrames, Series, tuples,
+    and other data types to ensure they can be converted to JSON format.
+
+    Args:
+        obj: The object to serialize.
+
+    Returns:
+        The serialized object in a JSON-compatible format.
+    """
     if isinstance(obj, np.ndarray):
-        return obj.tolist()  # Ensure ndarray is converted to list
+        return obj.tolist()  # Convert numpy array to list
     if isinstance(obj, (np.int64, np.float64)):
-        return int(obj) if isinstance(obj, np.int64) else float(obj)
+        return int(obj) if isinstance(obj, np.int64) else float(obj)  # Convert numpy int/float to Python int/float
     if isinstance(obj, tuple):
-        return {'__tuple__': True, 'items': list(obj)}
+        return {'__tuple__': True, 'items': list(obj)}  # Convert tuple to dictionary with tuple flag
     if isinstance(obj, (pd.DataFrame, pd.Series)):
-        return {'__pandas__': True, 'data': obj.to_dict()}
-    return str(obj)
+        return {'__pandas__': True, 'data': obj.to_dict()}  # Convert pandas DataFrame/Series to dictionary with pandas flag
+    return str(obj)  # Convert other types to string
 
 def deserialize(obj):
+    """
+    Deserialize JSON-compatible formats back to their original data types.
+
+    This function handles the deserialization of JSON-compatible formats back to numpy arrays,
+    pandas DataFrames, Series, tuples, and other data types.
+
+    Args:
+        obj: The JSON-compatible object to deserialize.
+
+    Returns:
+        The deserialized object in its original data type.
+    """
     if isinstance(obj, dict):
         if '__tuple__' in obj:
-            return tuple(deserialize(item) for item in obj['items'])
+            return tuple(deserialize(item) for item in obj['items'])  # Convert dictionary with tuple flag back to tuple
         if '__pandas__' in obj:
             data = obj['data']
             if isinstance(data, dict):
                 if all(isinstance(v, dict) for v in data.values()):
-                    return pd.DataFrame({k: deserialize(v) for k, v in data.items()})
+                    return pd.DataFrame({k: deserialize(v) for k, v in data.items()})  # Convert dictionary with pandas flag back to DataFrame
                 else:
-                    return pd.Series(deserialize(data))
+                    return pd.Series(deserialize(data))  # Convert dictionary with pandas flag back to Series
     elif isinstance(obj, list):
         # Check if the list should be converted back to a numpy array
         if all(isinstance(item, (int, float, list)) for item in obj):
             try:
-                return np.array(obj)
+                return np.array(obj)  # Convert list back to numpy array
             except ValueError:
-                return [deserialize(item) for item in obj]
-        return [deserialize(item) for item in obj]
-    return obj
+                return [deserialize(item) for item in obj]  # Recursively deserialize list items
+        return [deserialize(item) for item in obj]  # Recursively deserialize list items
+    return obj  # Return the object as is if no conversion is needed
 
 def save_checkpoint(df, table_name, engine):
+    """
+    Save a DataFrame to a PostgreSQL table as a checkpoint.
+
+    This function saves a copy of the DataFrame to a PostgreSQL table. If an error occurs,
+    it saves the DataFrame to a CSV file as a fallback.
+
+    Args:
+        df (pandas.DataFrame): The DataFrame to save.
+        table_name (str): The name of the PostgreSQL table.
+        engine (sqlalchemy.engine.Engine): The SQLAlchemy engine for PostgreSQL connection.
+    """
     df_copy = df.copy()
     
+    # Convert object columns to strings
     for col in df_copy.columns:
         if df_copy[col].dtype == 'object' or df_copy[col].dtypes.name == 'object':
             df_copy[col] = df_copy[col].apply(lambda x: str(x) if x is not None else None)
     
     try:
-        df_copy.to_sql(table_name, engine, if_exists='replace', index=False)
+        df_copy.to_sql(table_name, engine, if_exists='replace', index=False)  # Save DataFrame to PostgreSQL table
     except Exception as e:
         logger.error(f"Error saving checkpoint: {e}")
         csv_filename = f"{table_name}_checkpoint.csv"
-        df_copy.to_csv(csv_filename, index=False)
+        df_copy.to_csv(csv_filename, index=False)  # Save DataFrame to CSV file as fallback
         logger.info(f"Checkpoint saved to CSV: {csv_filename}")
 
 def load_checkpoint(table_name):
+    """
+    Load a checkpoint DataFrame from a PostgreSQL table.
+
+    This function loads a DataFrame from a PostgreSQL table if it exists. It also handles
+    the deserialization of JSON strings back to their original data types.
+
+    Args:
+        table_name (str): The name of the PostgreSQL table.
+
+    Returns:
+        pandas.DataFrame or None: The loaded DataFrame or None if the table does not exist.
+    """
     engine = get_postgres_engine()
     inspector = inspect(engine)
     if inspector.has_table(table_name):
@@ -84,6 +142,14 @@ def load_checkpoint(table_name):
     return None
 
 def load_source_data():
+    """
+    Load the source data from a CSV file.
+
+    This function loads the source data from the 'distinct_source_class.csv' file.
+
+    Returns:
+        pandas.DataFrame or None: The loaded source DataFrame or None if an error occurs.
+    """
     try:
         source_df = pd.read_csv('distinct_source_class.csv')
         logger.info("source_df loaded from CSV.")
@@ -93,6 +159,14 @@ def load_source_data():
         return None
 
 def load_target_data():
+    """
+    Load the target data from a CSV file.
+
+    This function loads the target data from the 'target_taxonomy.csv' file.
+
+    Returns:
+        pandas.DataFrame or None: The loaded target DataFrame or None if an error occurs.
+    """
     try:
         target_df = pd.read_csv('target_taxonomy.csv')
         logger.info("target_df loaded from CSV.")
@@ -102,6 +176,19 @@ def load_target_data():
         return None
 
 def process_chunk(chunk, target_df):
+    """
+    Process a chunk of the source DataFrame by applying synonym matching, cosine similarity matching, and combined scoring.
+
+    This function initializes the matchers within the worker process, applies synonym matching,
+    generates embeddings, applies cosine similarity matching, and calculates combined scores.
+
+    Args:
+        chunk (pandas.DataFrame): The chunk of the source DataFrame to process.
+        target_df (pandas.DataFrame): The target DataFrame.
+
+    Returns:
+        pandas.DataFrame: The processed chunk with matches and scores.
+    """
     # Initialize matchers within the worker process
     synonym_matcher = SynonymMatcher()
     cosine_matcher = CosineSimilarityMatcher()
@@ -122,6 +209,14 @@ def process_chunk(chunk, target_df):
 def main():
     """
     Main function to execute the category matching and scoring process.
+
+    This function performs the following steps:
+    1. Data Loading and Preprocessing
+    2. Synonym Matching
+    3. Cosine Similarity Matching
+    4. Combined Scoring
+    5. Saving Results
+    6. Validation
     """
     engine = get_postgres_engine()
 

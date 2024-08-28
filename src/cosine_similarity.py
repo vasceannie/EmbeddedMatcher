@@ -20,7 +20,10 @@ class CosineSimilarityMatcher:
         """
         Initializes the CosineSimilarityMatcher by loading the BERT tokenizer and model.
         """
+        # Load the BERT tokenizer from the pre-trained 'bert-base-uncased' model
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        
+        # Load the BERT model from the pre-trained 'bert-base-uncased' model
         self.model = BertModel.from_pretrained('bert-base-uncased')
 
     def get_bert_embedding(self, text):
@@ -39,6 +42,7 @@ class CosineSimilarityMatcher:
         
         # Disable gradient calculation for efficiency
         with torch.no_grad():
+            # Get the outputs from the BERT model
             outputs = self.model(**inputs)
         
         # Return the mean of the last hidden states as the embedding

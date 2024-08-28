@@ -23,6 +23,9 @@ class EmbeddingManager:
         """
         Construct the PostgreSQL connection string from environment variables.
 
+        This method retrieves the PostgreSQL connection details from environment variables
+        and constructs a connection string that can be used to connect to the PostgreSQL database.
+
         Returns:
             str: The constructed PostgreSQL connection string.
         """
@@ -41,6 +44,9 @@ class EmbeddingManager:
         """
         Save the BERT embeddings and their associated categories to the specified database.
 
+        This method saves the DataFrame containing BERT embeddings and their associated categories
+        to a specified storage option, which can be a CSV file, PostgreSQL database, or MongoDB database.
+
         Args:
             df (pandas.DataFrame): The DataFrame containing 'category' and 'bert_embedding' columns.
             path_or_connection_string (str): The path to save to CSV or the connection string for PostgreSQL or MongoDB.
@@ -49,10 +55,13 @@ class EmbeddingManager:
         Returns:
             None
         """
+        # Check if the path_or_connection_string is a string
         if isinstance(path_or_connection_string, str):
+            # Create an SQLAlchemy engine using the connection string
             engine = create_engine(path_or_connection_string)
         else:
-            engine = path_or_connection_string  # Assume it's already an engine object
+            # Assume path_or_connection_string is already an engine object
+            engine = path_or_connection_string  
         
         if db_type == 'csv':
             # Save the DataFrame to a CSV file
@@ -74,6 +83,9 @@ class EmbeddingManager:
     def load_embeddings(path_or_connection_string, db_type='postgres'):
         """
         Load BERT embeddings from the specified database into a DataFrame.
+
+        This method loads BERT embeddings and their associated categories from a specified storage option,
+        which can be a CSV file, PostgreSQL database, or MongoDB database, into a pandas DataFrame.
 
         Args:
             path_or_connection_string (str): The path to load from CSV or the connection string for PostgreSQL or MongoDB.
