@@ -7,8 +7,9 @@ class CombinedMatcher:
     This class provides methods to calculate a combined score based on the results from synonym matching
     and cosine similarity, determining the best match along with its score.
     """
-    def __init__(self):
-        pass
+    def __init__(self, synonym_weight=0.3, cosine_weight=0.7):
+        self.synonym_weight = synonym_weight
+        self.cosine_weight = cosine_weight
 
     @staticmethod
     def combined_match(synonym_matches, cosine_matches):
@@ -58,17 +59,8 @@ class CombinedMatcher:
         return df
 
     def apply_combined_scoring(self, df):
-        if df is None:
-            logging.error("DataFrame is None in apply_combined_scoring")
-            return None
-
         df['final_match'] = df.apply(lambda row: self.combined_match(
-            row['synonym_matches'],
-            row['cosine_matches']
+            row.get('synonym_matches', []),
+            row.get('cosine_matches', [])
         ), axis=1)
-
-        # Ensure that final_match contains two values (match and score)
-        if df['final_match'].apply(lambda x: len(x) if isinstance(x, (list, tuple)) else 0).min() < 2:
-            raise ValueError("final_match must contain both the match and the score")
-
         return df
