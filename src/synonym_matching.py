@@ -26,6 +26,15 @@ class SynonymMatcher:
         self.stop_words = set(stopwords.words('english'))
 
     def tokenize(self, text):
+        """
+        Tokenize the input text by converting it to lowercase, removing punctuation and stopwords.
+
+        Args:
+            text (str): The input text to tokenize.
+
+        Returns:
+            list: A list of tokens after processing the input text.
+        """
         # Convert to lowercase and tokenize
         tokens = word_tokenize(text.lower())
         # Remove punctuation and stopwords
@@ -51,14 +60,29 @@ class SynonymMatcher:
         return synonyms  # Return the set of synonyms
 
     def synonym_match(self, source_category, target_df):
+        """
+        Perform synonym matching between a source category and target categories in a DataFrame.
+
+        Args:
+            source_category (str): The source category to match against target categories.
+            target_df (pandas.DataFrame): The DataFrame containing target categories.
+
+        Returns:
+            list: A list of tuples containing the target category and its match score,
+                  sorted in descending order of match score.
+        """
         matches = []
+        # Tokenize the source category and get its synonyms
         source_tokens = set(self.tokenize(source_category))
         source_synonyms = set()
         for token in source_tokens:
             source_synonyms.update(self.get_synonyms(token))
         
+        # Iterate through each row in the target DataFrame
         for _, row in target_df.iterrows():
+            # Get the target category from the row
             target_category = row.get('category_name') or row.get('processed_category') or row.iloc[0]
+            # Tokenize the target category and get its synonyms
             target_tokens = set(self.tokenize(str(target_category)))
             target_synonyms = set()
             for token in target_tokens:
@@ -69,11 +93,12 @@ class SynonymMatcher:
             union = len(source_synonyms.union(target_synonyms))
             match_score = intersection / union if union > 0 else 0
             
-            # Only append matches with a score greater than the threshold
+            # Append matches with their scores
             matches.append((target_category, match_score))
         
         # Sort matches by score in descending order
         matches.sort(key=lambda x: x[1], reverse=True)
+        # Filter matches based on the threshold
         return [match for match in matches if match[1] > self.threshold]
 
     def apply_synonym_matching(self, source_df, target_df):
