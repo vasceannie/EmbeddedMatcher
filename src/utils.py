@@ -1,5 +1,6 @@
 import pandas as pd
 import sqlalchemy
+from sqlalchemy import create_engine
 from pymongo import MongoClient
 import numpy as np
 import json
@@ -14,7 +15,7 @@ class EmbeddingManager:
     A class to manage the saving and loading of BERT embeddings.
 
     This class provides methods to save BERT embeddings and their associated categories to various storage options,
-    including CSV files, PostgreSQL, MongoDB, and universal database types.
+    including PostgreSQL and MongoDB.
     """
 
     @staticmethod
@@ -27,73 +28,77 @@ class EmbeddingManager:
         db = os.getenv('POSTGRES_DB', 'your_database_name')
         user = os.getenv('POSTGRES_USER', 'your_username')
         password = os.getenv('POSTGRES_PASSWORD', 'your_password')
-        return f"postgresql://{user}:{password}@{host}:{port}/{db}"
+        return f"postgresql://{user}:{password}@{host}:{port}/{db}?connect_timeout=60"
 
     @staticmethod
-    def save_embeddings(df, destination, db_type='csv'):
+    def save_embeddings(df, path_or_connection_string, db_type='postgres'):
         """
-        Save the BERT embeddings and their associated categories to the specified destination.
+        Save the BERT embeddings and their associated categories to the specified database.
 
         Args:
             df (pandas.DataFrame): The DataFrame containing 'category' and 'bert_embedding' columns.
-            destination (str): The destination where the DataFrame will be saved (filename for CSV, connection string for databases).
-            db_type (str): The type of database ('csv', 'postgres', 'mongo', or 'universal'). Default is 'csv'.
-        """
-        df = df.copy()
-        df['bert_embedding'] = df['bert_embedding'].apply(lambda x: x.tolist())
+            path_or_connection_string (str): The path to save to CSV or the connection string for PostgreSQL or MongoDB.
+            db_type (str): The type of database ('csv', 'postgres', or 'mongo'). Default is 'csv'.
 
-        load_dotenv()  # Load environment variables from .env file
+        Returns:
+            None
+        """
         if db_type == 'csv':
-            df['bert_embedding'] = df['bert_embedding'].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
-            df.to_csv(destination, index=False)
+            df.to_csv(path_or_connection_string, index=False)
         elif db_type == 'postgres':
-            connection_string = EmbeddingManager.get_postgres_connection_string()
-            engine = sqlalchemy.create_engine(connection_string)
-            df['bert_embedding'] = df['bert_embedding'].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
+            engine = create_engine(path_or_connection_string)
             df.to_sql('embeddings', engine, if_exists='replace', index=False)
         elif db_type == 'mongo':
-            client = MongoClient(destination)
-            db = client['embeddings_db']
-            collection = db['embeddings']
-            records = df.to_dict(orient='records')
-            collection.insert_many(records)
-        elif db_type == 'universal':
-            # Implement universal database saving logic here
-            pass
+            client = MongoClient(path_or_connection_string)
+            db = client['embedding_db']
+            collection = db['embeddings']  # {{ edit_1 }} Define the collection
+            collection.insert_many(df.to_dict('records'))
         else:
-            raise ValueError("Unsupported database type. Use 'csv', 'postgres', 'mongo', or 'universal'.")
+            raise ValueError(f"Unsupported db_type: {db_type}")
 
     @staticmethod
-    def load_embeddings(destination, db_type='csv'):
+    def load_embeddings(path_or_connection_string, db_type='postgres'):
         """
-        Load BERT embeddings from the specified source into a DataFrame.
+        Load BERT embeddings from the specified database into a DataFrame.
 
         Args:
-            destination (str): The source from which to load the embeddings (filename for CSV, connection string for databases).
-            db_type (str): The type of database ('csv', 'postgres', 'mongo', or 'universal'). Default is 'csv'.
+            path_or_connection_string (str): The path to load from CSV or the connection string for PostgreSQL or MongoDB.
+            db_type (str): The type of database ('csv', 'postgres', or 'mongo'). Default is 'csv'.
 
         Returns:
             pandas.DataFrame: A DataFrame containing the loaded categories and their BERT embeddings.
         """
-        load_dotenv()  # Load environment variables from .env file
         if db_type == 'csv':
-            df = pd.read_csv(destination)
-            df['bert_embedding'] = df['bert_embedding'].apply(lambda x: np.array(json.loads(x)) if isinstance(x, str) else x)
+            df = pd.read_csv(path_or_connection_string)
+            # Convert the 'bert_embedding' column back to numpy arrays
+            df['bert_embedding'] = df['bert_embedding'].apply(
+                lambda x: np.array(json.loads(x.replace('\x00', ''))) if isinstance(x, str) and x.startswith('[') else np.array(x, dtype=float)
+            )
+            return df
         elif db_type == 'postgres':
-            connection_string = EmbeddingManager.get_postgres_connection_string()
-            engine = sqlalchemy.create_engine(connection_string)
-            df = pd.read_sql('embeddings', engine)
-            df['bert_embedding'] = df['bert_embedding'].apply(lambda x: np.array(json.loads(x)))
+            engine = create_engine(path_or_connection_string)
+            df = pd.read_sql_table('embeddings', engine)
+            # Convert the 'bert_embedding' column back to numpy arrays
+            df['bert_embedding'] = df['bert_embedding'].apply(
+                lambda x: np.array(json.loads(x.replace('{', '[').replace('}', ']'))) 
+                if isinstance(x, str) and (x.startswith('[') or x.startswith('{')) 
+                else np.array(x, dtype=float)
+            )
+            return df
         elif db_type == 'mongo':
-            client = MongoClient(destination)
-            db = client['embeddings_db']
-            collection = db['embeddings']
-            records = collection.find()
-            df = pd.DataFrame(list(records))
-        elif db_type == 'universal':
-            # Implement universal database loading logic here
-            pass
+            client = MongoClient(path_or_connection_string)
+            db = client['embedding_db']
+            collection = db['embeddings']  # {{ edit_1 }} Define the collection
+            # Load BERT embeddings from the specified database into a DataFrame.
+            df = pd.DataFrame(list(collection.find()))
+            # Sanitize the 'bert_embedding' column to remove any entries with null bytes
+            df = df[df['bert_embedding'].apply(lambda x: isinstance(x, str) and '\x00' not in x)]
+            # Convert the 'bert_embedding' column back to numpy arrays
+            df['bert_embedding'] = df['bert_embedding'].apply(
+                lambda x: np.array(json.loads(x.replace('{', '[').replace('}', ']'))) 
+                if isinstance(x, str) and (x.startswith('[') or x.startswith('{')) 
+                else np.array(x, dtype=float)
+            )
+            return df
         else:
-            raise ValueError("Unsupported database type. Use 'csv', 'postgres', 'mongo', or 'universal'.")
-
-        return df
+            raise ValueError(f"Unsupported db_type: {db_type}")

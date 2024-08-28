@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 from transformers import BertTokenizer, BertModel
 import torch
@@ -54,7 +55,13 @@ class CosineSimilarityMatcher:
             pandas.DataFrame: The DataFrame with an additional 'bert_embedding' column
                               containing the generated embeddings.
         """
-        # Apply the get_bert_embedding function to each processed category
+        # Log the state of the DataFrame
+        logging.info(f"DataFrame before generating embeddings: {df.head()}")
+        
+        # Ensure 'processed_category' column exists
+        if 'processed_category' not in df.columns:
+            raise KeyError("The column 'processed_category' does not exist in the DataFrame.")
+        
         df['bert_embedding'] = df['processed_category'].apply(self.get_bert_embedding)
         return df
 

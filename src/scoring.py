@@ -1,21 +1,19 @@
+import logging
+
 class CombinedMatcher:
     """
     A class to combine the results of synonym matching and cosine similarity.
 
     This class provides methods to calculate a combined score based on the results from synonym matching
     and cosine similarity, determining the best match along with its score.
-
-    Attributes:
-        None
     """
+    def __init__(self):
+        pass
 
     @staticmethod
     def combined_match(synonym_matches, cosine_matches):
         """
         Combine the results of synonym matching and cosine similarity to determine the best match.
-
-        This method takes two sets of matches: one from synonym matching and another from cosine similarity.
-        It calculates a combined score based on the provided matches and returns the best match along with its score.
 
         Args:
             synonym_matches (list): A list of tuples where each tuple contains a synonym match and its associated score.
@@ -29,34 +27,48 @@ class CombinedMatcher:
             return None, 0
 
         if not synonym_matches:
-            return cosine_matches[0]
+            return max(cosine_matches, key=lambda x: x[1])
 
         if not cosine_matches:
-            return synonym_matches[0]
+            return max(synonym_matches, key=lambda x: x[1])
 
-        # Fix: Use the correct index for cosine_matches
-        combined_score = (synonym_matches[0][1] + cosine_matches[0][1]) / 2
-        
         # Return the match with the highest individual score
-        if synonym_matches[0][1] >= cosine_matches[0][1]:
-            return synonym_matches[0]
-        else:
-            return cosine_matches[0]
+        best_synonym_match = max(synonym_matches, key=lambda x: x[1])
+        best_cosine_match = max(cosine_matches, key=lambda x: x[1])
+
+        return best_synonym_match if best_synonym_match[1] >= best_cosine_match[1] else best_cosine_match
 
     @staticmethod
     def apply_combined_scoring(df):
-        """
-        Apply the combined matching function to a DataFrame to generate final matches.
+        if df is None:
+            logging.error("DataFrame is None in apply_combined_scoring")
+            return None
 
-        This method takes a DataFrame and applies the combined_match function to each row,
-        using the 'synonym_matches' and 'cosine_matches' columns to compute the final match for each entry.
+        df['final_match'] = df.apply(lambda row: CombinedMatcher.debug_combined_match(
+            row['classification_name'],
+            row['processed_category'],
+            row['synonym_matches'],
+            row['cosine_matches']
+        ), axis=1)
 
-        Args:
-            df (pandas.DataFrame): The DataFrame containing 'synonym_matches' and 'cosine_matches' columns.
+        # Ensure that final_match contains two values (match and score)
+        if df['final_match'].apply(lambda x: len(x) if isinstance(x, (list, tuple)) else 0).min() < 2:
+            raise ValueError("final_match must contain both the match and the score")
 
-        Returns:
-            pandas.DataFrame: The updated DataFrame with a new column 'final_match' containing the results of the combined matching.
-        """
-        # Apply the combined_match function to each row of the DataFrame and store the results in a new column 'final_match'
-        df['final_match'] = df.apply(lambda row: CombinedMatcher.combined_match(row['synonym_matches'], row['cosine_matches']), axis=1)
+        return df
+
+    def apply_combined_scoring(self, df):
+        if df is None:
+            logging.error("DataFrame is None in apply_combined_scoring")
+            return None
+
+        df['final_match'] = df.apply(lambda row: self.combined_match(
+            row['synonym_matches'],
+            row['cosine_matches']
+        ), axis=1)
+
+        # Ensure that final_match contains two values (match and score)
+        if df['final_match'].apply(lambda x: len(x) if isinstance(x, (list, tuple)) else 0).min() < 2:
+            raise ValueError("final_match must contain both the match and the score")
+
         return df

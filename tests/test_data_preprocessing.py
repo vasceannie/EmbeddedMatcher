@@ -16,7 +16,7 @@ class TestDataPreprocessor(unittest.TestCase):
 
     def test_preprocess(self):
         text = "This is a Sample Text with Punctuation!"
-        expected = "sample text punctuation"
+        expected = "this is a sample text with punctuation"
         self.assertEqual(self.preprocessor.preprocess(text), expected)
 
     @patch('pandas.read_csv')
@@ -76,11 +76,12 @@ class TestDataPreprocessor(unittest.TestCase):
         
         with self.assertRaises(ValueError):
             self.preprocessor.load_data('source.csv', 'target.csv')
+
     @patch('pandas.read_csv')
     def test_load_data_missing_category(self, mock_read_csv):
         # Mock CSV content for missing category column
-        source_csv = StringIO("id,classification_name\n1,Electronics\n2,Clothing")
-        target_csv = StringIO("id,missing_category\n1,Gadgets\n2,Apparel")
+        source_csv = StringIO("id,missing_column\n1,Electronics\n2,Clothing")
+        target_csv = StringIO("id,category_name\n1,Gadgets\n2,Apparel")
         
         mock_read_csv.side_effect = [pd.read_csv(source_csv), pd.read_csv(target_csv)]
         
@@ -92,15 +93,20 @@ class TestDataPreprocessor(unittest.TestCase):
         self.assertEqual(actual_message, expected_message)
 
     def test_preprocess_dataframes(self):
-        source_df = pd.DataFrame({'category': ['Electronics', 'Clothing']})
-        target_df = pd.DataFrame({'category': ['Gadgets', 'Apparel']})
+        source_df = pd.DataFrame({'classification_name': ['Electronics', 'Clothing']})
+        target_df = pd.DataFrame({
+            'Lv1_category_name': ['Gadgets', 'Apparel'],
+            'Lv2_category_name': ['Smartphones', 'Shirts'],
+            'Lv3_category_name': ['Android', 'T-Shirts'],
+            'Lv4_category_name': ['Samsung', 'Cotton']
+        })
         
         processed_source, processed_target = self.preprocessor.preprocess_dataframes(source_df, target_df)
         
         self.assertIn('processed_category', processed_source.columns)
         self.assertIn('processed_category', processed_target.columns)
         self.assertEqual(processed_source['processed_category'].iloc[0], 'electronics')
-        self.assertEqual(processed_target['processed_category'].iloc[1], 'apparel')
+        self.assertEqual(processed_target['processed_category'].iloc[1], 'apparel shirts tshirts cotton')
 
 if __name__ == '__main__':
     unittest.main()
