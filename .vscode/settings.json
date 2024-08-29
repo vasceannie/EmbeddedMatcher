@@ -11,5 +11,16 @@
     "cSpell.words": [
         "ndim"
     ],
-    "wolf.disableHotModeWarning": true
+    "wolf.disableHotModeWarning": true,
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "ARS",
+            "database": "ars_spend_class",
+            "username": "overlord"
+        }
+    ]
 }

@@ -2,3 +2,13 @@
 __pycache__/
 *.venv/
 .env
+*.xlsx
+*.xlsm
+*.xls
+*.xlsb
+*.xltx
+*.xltm
+*.xlt
+*.xlb
+*.xlm
+*.session.sql
